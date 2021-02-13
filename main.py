@@ -3,6 +3,9 @@ import random
 
 # initialisation
 pygame.init()
+# setting the CPU clock
+# setting the clock is necessary as it prevents fast gameplay in powerful cpu
+clock = pygame.time.Clock()
 
 # creating the display Surface of 800x600 size
 screen = pygame.display.set_mode(size=(800, 600))
@@ -12,12 +15,26 @@ pygame.display.set_caption('Space Invader')  # setting the title
 icon = pygame.image.load('assets/icon.png')  # loading the icon asset
 pygame.display.set_icon(icon)
 
-enemy_1_img = pygame.image.load('assets/enemy1.png')
-player_img = pygame.image.load('assets/player.png')  # loads the image of player as a Surface
+# loading the image assets
+enemy_1_img = pygame.image.load('assets/enemy1.png').convert_alpha()
+player_img = pygame.image.load('assets/player.png').convert_alpha()
+background_img = pygame.image.load('assets/background.png').convert_alpha()
+laser_player_img = pygame.image.load('assets/laser_player.png').convert_alpha()
+
+# setting constant fields
+ENEMY_SPAWN_X = (0, 800)
+ENEMY_SPAWN_Y = (50, 150)
+ENEMY_X_MOVE = 0.5
+ENEMY_Y_MOVE = 40
+PLAYER_MOVE = 1
+INIT_PLAYER_X = 370
+INIT_PLAYER_Y = 500
+LASER_PLAYER_MOVE = 4
+FPS = 300
 
 
 def set_player(x, y) -> None:
-    screen.fill((255, 255, 255))
+    # screen.fill((255, 255, 255))
     screen.blit(player_img, (x, y))  # blit() method draws the image (Surface) on the (x, y) coordinate
 
 
@@ -25,20 +42,39 @@ def set_enemy(x, y) -> None:
     screen.blit(enemy_1_img, (x, y))
 
 
-def game_loop() -> None:
-    # A loop to keep the window alive
-    player_x = 370
-    player_y = 500
-    player_x_change = 0
-    player_y_change = 0
+def fire_player_laser(x, y):
+    screen.blit(laser_player_img, (x, y))
 
-    enemy_x = random.randint(0, 800)
-    enemy_y = random.randint(50, 150)
-    enemy_x_change = 0.3
-    enemy_y_change = 40
+
+def game_loop() -> None:
+    # player
+    player_x = INIT_PLAYER_X
+    player_y = INIT_PLAYER_Y
+    player_x_change = 0
+
+    # enemy
+    # we are using random numbers to spawn enemies randomly on the screen
+    enemy_x = random.randint(ENEMY_SPAWN_X[0], ENEMY_SPAWN_X[1])
+    enemy_y = random.randint(ENEMY_SPAWN_Y[0], ENEMY_SPAWN_Y[1])
+    enemy_x_change = ENEMY_X_MOVE  # initially the enemy will start to move in the right direction
+    enemy_y_change = ENEMY_Y_MOVE  # enemy will never move up so always +40 downwards
+
+    # laser_player
+    laser_player_x = 0
+    laser_player_y = INIT_PLAYER_Y    # initially same level as player
+    laser_player_change_y = LASER_PLAYER_MOVE
+    laser_player_fire = False   # true means laser has been fired
 
     running = True  # tracks the running state of the window
     while running:
+        # locking to a certain fps
+        clock.tick(FPS)
+
+        # every time we need to set the screen background before drawing players to remove ghosting
+        # screen.fill((255, 255, 255))
+        screen.blit(background_img, (0, 0))
+
+        # A loop to keep the window alive
         for event in pygame.event.get():
             # pygame.event.get() gets event from the Event Queue
             if event.type == pygame.WINDOWCLOSE:
@@ -50,10 +86,14 @@ def game_loop() -> None:
                 # KEYDOWN is used to check a button down (press) event
                 if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                     # event is a dict type object with a 'key' as a key and keyboard button code as the value
-                    player_x_change = -0.35
-                elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:
+                    player_x_change = -PLAYER_MOVE
+                if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                     # event is a dict type object with a 'key' as a key and keyboard button code as the value
-                    player_x_change = 0.35
+                    player_x_change = PLAYER_MOVE
+                if event.key == pygame.K_SPACE:
+                    if not laser_player_fire:
+                        laser_player_fire = True
+                        laser_player_x = player_x
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_a or event.key == pygame.K_d or event.key == pygame.K_LEFT or pygame.K_RIGHT:
@@ -69,14 +109,31 @@ def game_loop() -> None:
         # enemy movements
         enemy_x += enemy_x_change
         if enemy_x <= 0:
-            enemy_x_change = 0.3
+            # moving enemy to down and right
+            enemy_x_change = ENEMY_X_MOVE
             enemy_y += enemy_y_change
         elif enemy_x >= 736:
-            enemy_x_change = -0.3
+            # moving enemy to down and left
+            enemy_x_change = -ENEMY_X_MOVE
             enemy_y += enemy_y_change
+
+        # player's laser movement
+        if laser_player_y <= 0:
+            # laser crossed the screen
+            laser_player_x = 0
+            laser_player_y = INIT_PLAYER_Y
+            laser_player_fire = False
+
+        if laser_player_fire:
+            laser_player_y -= laser_player_change_y
+            # these constants +25 +10 are to align the laser with the player
+            fire_player_laser(laser_player_x + 25, laser_player_y + 10)
+
         set_player(player_x, player_y)
         set_enemy(enemy_x, enemy_y)
-        pygame.display.update()  # display.update() will update any change happened on the screen
+
+        # display.update() will update any change happened on the screen
+        pygame.display.update()
 
 
 game_loop()
