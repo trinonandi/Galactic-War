@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 
 # initialisation
 pygame.init()
@@ -22,7 +23,7 @@ background_img = pygame.image.load('assets/background.png').convert_alpha()
 laser_player_img = pygame.image.load('assets/laser_player.png').convert_alpha()
 
 # setting constant fields
-ENEMY_SPAWN_X = (0, 800)
+ENEMY_SPAWN_X = (0, 735)
 ENEMY_SPAWN_Y = (50, 150)
 ENEMY_X_MOVE = 0.5
 ENEMY_Y_MOVE = 40
@@ -42,8 +43,21 @@ def set_enemy(x, y) -> None:
     screen.blit(enemy_1_img, (x, y))
 
 
-def fire_player_laser(x, y):
+def fire_player_laser(x, y) -> None:
     screen.blit(laser_player_img, (x, y))
+
+
+def has_collided(x1, y1, x2, y2) -> bool:
+    # we can check if two objects have collided by calculating the distance between them
+    x_sq = math.pow((x2 - x1), 2)
+    y_sq = math.pow((y2 - y1), 2)
+    distance = math.sqrt(x_sq + y_sq)
+    return distance < 50
+
+
+def show_score(x, y, font, total_score):
+    score = font.render("Score : " + str(total_score), True, (255, 255, 255))
+    screen.blit(score, (x, y))
 
 
 def game_loop() -> None:
@@ -54,16 +68,26 @@ def game_loop() -> None:
 
     # enemy
     # we are using random numbers to spawn enemies randomly on the screen
-    enemy_x = random.randint(ENEMY_SPAWN_X[0], ENEMY_SPAWN_X[1])
-    enemy_y = random.randint(ENEMY_SPAWN_Y[0], ENEMY_SPAWN_Y[1])
+    enemy_x = []
+    enemy_y = []
     enemy_x_change = ENEMY_X_MOVE  # initially the enemy will start to move in the right direction
     enemy_y_change = ENEMY_Y_MOVE  # enemy will never move up so always +40 downwards
+    enemy_count = 6
+    for _ in range(enemy_count):
+        enemy_x.append(random.randint(ENEMY_SPAWN_X[0], ENEMY_SPAWN_X[1]))
+        enemy_y.append(random.randint(ENEMY_SPAWN_Y[0], ENEMY_SPAWN_Y[1]))
 
     # laser_player
     laser_player_x = 0
     laser_player_y = INIT_PLAYER_Y    # initially same level as player
     laser_player_change_y = LASER_PLAYER_MOVE
     laser_player_fire = False   # true means laser has been fired
+
+    # scores
+    total_score = 0
+    font = pygame.font.Font('freesansbold.ttf', 28)
+    score_x = 10
+    score_y = 10
 
     running = True  # tracks the running state of the window
     while running:
@@ -86,11 +110,13 @@ def game_loop() -> None:
                 # KEYDOWN is used to check a button down (press) event
                 if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                     # event is a dict type object with a 'key' as a key and keyboard button code as the value
+                    # left movement
                     player_x_change = -PLAYER_MOVE
                 if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
-                    # event is a dict type object with a 'key' as a key and keyboard button code as the value
+                    # right movement
                     player_x_change = PLAYER_MOVE
                 if event.key == pygame.K_SPACE:
+                    # fire laser
                     if not laser_player_fire:
                         laser_player_fire = True
                         laser_player_x = player_x
@@ -107,19 +133,33 @@ def game_loop() -> None:
         player_x += player_x_change
 
         # enemy movements
-        enemy_x += enemy_x_change
-        if enemy_x <= 0:
-            # moving enemy to down and right
-            enemy_x_change = ENEMY_X_MOVE
-            enemy_y += enemy_y_change
-        elif enemy_x >= 736:
-            # moving enemy to down and left
-            enemy_x_change = -ENEMY_X_MOVE
-            enemy_y += enemy_y_change
+        for i in range(6):
+            enemy_x[i] += enemy_x_change
+            if enemy_x[i] <= 0:
+                # moving enemy to down and right
+                enemy_x_change = ENEMY_X_MOVE
+                enemy_y[i] += enemy_y_change
+            elif enemy_x[i] >= 736:
+                # moving enemy to down and left
+                enemy_x_change = -ENEMY_X_MOVE
+                enemy_y[i] += enemy_y_change
+
+            # player's laser collision
+            if has_collided(enemy_x[i], enemy_y[i], laser_player_x, laser_player_y):
+                # reset bullet, increase score by 1 and respawn enemy
+                laser_player_x = 0
+                laser_player_y = INIT_PLAYER_Y
+                laser_player_fire = False
+                total_score += 1
+                enemy_x[i] = random.randint(ENEMY_SPAWN_X[0], ENEMY_SPAWN_X[1])
+                enemy_y[i] = random.randint(ENEMY_SPAWN_Y[0], ENEMY_SPAWN_Y[1])
+                print(total_score)
+
+            set_enemy(enemy_x[i], enemy_y[i])
 
         # player's laser movement
         if laser_player_y <= 0:
-            # laser crossed the screen
+            # laser crossed the screen so reset it
             laser_player_x = 0
             laser_player_y = INIT_PLAYER_Y
             laser_player_fire = False
@@ -130,8 +170,7 @@ def game_loop() -> None:
             fire_player_laser(laser_player_x + 25, laser_player_y + 10)
 
         set_player(player_x, player_y)
-        set_enemy(enemy_x, enemy_y)
-
+        show_score(score_x, score_y, font, total_score)
         # display.update() will update any change happened on the screen
         pygame.display.update()
 
